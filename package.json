@@ -1,0 +1,22 @@
+{
+  "name": "ql-sf-checkin",
+  "version": "3.0.0",
+  "description": "顺丰速运小程序每日签到 & 日常任务脚本 - 支持青龙面板",
+  "main": "sfsy.js",
+  "scripts": {
+    "start": "node sfsy.js",
+    "test": "node sfsy.js"
+  },
+  "keywords": [
+    "顺丰速运",
+    "签到",
+    "青龙面板",
+    "日常任务",
+    "积分"
+  ],
+  "author": "QL-SF-CHECKIN",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
