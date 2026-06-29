@@ -29,6 +29,9 @@
 |--------|------|--------|
 | `SFBF` | 并发数量（1-20），1为串行 | `1` |
 | `SF_PROXY_API_URL` | 代理 API 地址（返回 ip:port 格式） | 空（不使用代理） |
+| `WXPUSHER_APP_TOKEN` | WxPusher 应用Token（启用推送） | 空（不推送） |
+| `WXPUSHER_UIDS` | WxPusher 用户UID，多个用逗号分隔 | 空 |
+| `WXPUSHER_TOPIC_IDS` | WxPusher 主题ID，多个用逗号分隔 | 空 |
 
 ## 获取 sfsyUrl
 
@@ -182,6 +185,34 @@ TaskExecutor    # 任务执行器
 AccountManager  # 账号管理器
 main()          # 主程序入口
 ```
+
+## WxPusher 推送（可选）
+
+支持通过 WxPusher 推送签到结果和 sfsyUrl 过期提醒到微信。
+
+### 配置方式
+
+在青龙面板 → 环境变量中添加：
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `WXPUSHER_APP_TOKEN` | WxPusher 应用 Token（必填） | `AT_xxx...` |
+| `WXPUSHER_UIDS` | 用户 UID，多个用逗号分隔 | `UID_xxx,UID_yyy` |
+| `WXPUSHER_TOPIC_IDS` | 主题 ID，多个用逗号分隔 | `123,456` |
+
+> `WXPUSHER_UIDS` 和 `WXPUSHER_TOPIC_IDS` 至少配置一个。
+
+### 推送内容
+
+- **全部成功**：推送签到汇总，包含每个账号获得的积分
+- **有账号失效**：推送失败提醒，提示哪个账号的 sfsyUrl 需要更新
+
+### 获取 WxPusher Token
+
+1. 微信搜索「WxPusher」公众号并关注
+2. 访问 [wxpusher.zjiecode.com](https://wxpusher.zjiecode.com/) 注册账号
+3. 创建应用，获取 `APP_TOKEN`
+4. 在公众号后台获取你的 `UID`
 
 ## 注意事项
 
