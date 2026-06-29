@@ -21,7 +21,7 @@
 
 | 变量名 | 说明 | 示例 |
 |--------|------|------|
-| `sfsyUrl` | 顺丰速运小程序抓包URL，多账号用 `&` 分隔 | `https://mcs-mimp-web.sf-express.com/...` |
+| `sfsyUrl` | 顺丰速运小程序登录态，多账号用 `&` 分隔 | `sessionId=xxx;_login_mobile_=13800138000;_login_user_id_=xxx` |
 
 ### 可选变量
 
@@ -32,67 +32,25 @@
 
 ## 获取 sfsyUrl
 
-### 方法一：综合工具（推荐 ⭐⭐⭐）
+### iPhone 抓包（Stream 方式）
 
-**三合一工具**：扫码登录 + 代理抓包 + 手动同步，自动降级，一个脚本全搞定。
+1. App Store 搜索下载 **Stream**（开发者 Suying，免费）
+2. 打开 Stream → HTTPS 抓包 → 安装证书 → 允许下载描述文件
+3. 设置 → 已下载描述文件 → 安装证书
+4. 设置 → 通用 → 关于本机 → 证书信任设置 → 开启 Stream 证书
+5. Stream 首页 → 开始抓包
+6. 打开微信 → 顺丰速运+小程序 → 进入「我的」或「积分」页面
+7. 回到 Stream → 停止抓包 → 抓包历史
+8. 搜索 `mcs-mimp-web`，找到 Cookie 里有 `_login_user_id_` 和 `_login_mobile_` 的请求
+9. 从 Cookie 中提取 `sessionId`、`_login_mobile_`、`_login_user_id_`，拼成以下格式：
 
-```bash
-python sf_qrlogin.py
-```
-
-| 功能 | 说明 |
-|------|------|
-| 扫码登录 | 10+接口自动尝试，微信扫码即得 |
-| 代理抓包 | 扫码不行自动切换，mitmproxy 自动配置 |
-| 手动同步 | 已有URL直接粘贴同步 |
-| 青龙配置 | 一键配置青龙面板，自动同步 |
-| 账号管理 | 查看本地和青龙上的所有账号 |
-
-**推荐流程**：先试扫码登录 → 不行自动切代理抓包 → 手动兜底
-
-### 方法二：电脑微信代理抓包（单独版）
-
-电脑端打开微信小程序，脚本自动抓包 + 一键同步到青龙面板。
-
-```bash
-python sf_login.py
-```
-
-操作步骤：
-1. 运行 `sf_login.py`，选择「1 - 一键抓取」
-2. 脚本自动安装依赖 + 设置系统代理
-3. 打开电脑微信 → 顺丰速运+小程序 → 积分页面
-4. 自动捕获 sfsyUrl，一键同步到青龙
-
-首次使用需要安装 mitmproxy 证书（脚本有提示）。
-
-### 方法三：手机端抓包工具
-
-手机 WiFi 代理抓包，适合没有电脑微信的场景。
-
-```bash
-pip install mitmproxy
-python capture_sfsy.py
-```
-
-详细使用说明请参考 [CAPTURE_GUIDE.md](CAPTURE_GUIDE.md)
-
-### 方法四：手动抓包
-
-1. 打开微信，进入「顺丰速运+」小程序
-2. 进入「我的」→「积分」→ 任务列表界面
-3. 使用抓包工具（如 HttpCanary、Stream、Charles 等）抓取请求
-4. 找到以下任一 URL，复制完整 URL：
-   - `https://mcs-mimp-web.sf-express.com/mcs-mimp/share/weChat/shareGiftReceiveRedirect`
-   - `https://mcs-mimp-web.sf-express.com/mcs-mimp/share/app/shareRedirect`
-   - 任何包含 Cookie 的 mcs-mimp-web.sf-express.com 域名请求
-
-### Cookie 格式（可选）
-
-也可以直接使用 Cookie 字符串，格式如下：
 ```
 sessionId=xxx;_login_mobile_=13800138000;_login_user_id_=xxx
 ```
+
+### 安卓抓包
+
+类似原理，使用 **HttpCanary**（黄鸟）或 **Stream** 等抓包工具，抓取 `mcs-mimp-web.sf-express.com` 域名的请求，提取 Cookie 中的登录态。
 
 ## 青龙面板部署
 
@@ -113,7 +71,7 @@ ql repo https://github.com/Hayfan-wu/QL-SF-CHECKIN.git "sfsy" "" ""
 在青龙面板 → 环境变量 → 新增变量：
 
 - 名称：`sfsyUrl`
-- 值：抓包获取的完整 URL
+- 值：抓包获取的登录态（CK格式）
 - 多账号：用 `&` 分隔
 
 ### 定时任务
@@ -136,10 +94,10 @@ pip install -r requirements.txt
 
 ```bash
 # Windows (PowerShell)
-$env:sfsyUrl = "你的抓包URL"
+$env:sfsyUrl = "你的登录态"
 
 # Linux / macOS
-export sfsyUrl="你的抓包URL"
+export sfsyUrl="你的登录态"
 ```
 
 ### 运行脚本
@@ -192,10 +150,10 @@ export SFBF=5  # 5个账号并发执行
 
 ## 多账号支持
 
-在 `sfsyUrl` 变量中用 `&` 分隔多个 URL：
+在 `sfsyUrl` 变量中用 `&` 分隔多个登录态：
 
 ```
-https://mcs-mimp-web.sf-express.com/...账号1...&https://mcs-mimp-web.sf-express.com/...账号2...
+sessionId=xxx;_login_mobile_=13800138000;_login_user_id_=xxx&sessionId=yyy;_login_mobile_=13900139000;_login_user_id_=yyy
 ```
 
 脚本会随机打乱执行顺序，降低风控风险。
@@ -232,6 +190,7 @@ main()          # 主程序入口
 3. 请合理使用，避免频繁请求导致账号异常
 4. 如遇接口变更，请及时更新脚本
 5. 建议使用代理 IP 降低账号封禁风险
+6. sessionId 有效期约几天到一周，过期需重新抓包
 
 ## 免责声明
 
