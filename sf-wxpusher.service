@@ -1,0 +1,23 @@
+[Unit]
+Description=SF Express WxPusher Update Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/sf
+EnvironmentFile=/root/sf/.env
+ExecStart=/usr/bin/python3 /root/sf/sf_wxpusher_update.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sf-wxpusher
+
+# 资源限制
+MemoryLimit=128M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target
