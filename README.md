@@ -32,7 +32,21 @@
 
 ## 抓包教程
 
-### 方法一：小程序抓包
+### 方法一：一键抓包工具（推荐）
+
+本项目附带了一键抓包工具 `capture_sfsy.py`，自动捕获并提取 sfsyUrl。
+
+```bash
+# 安装依赖
+pip install mitmproxy
+
+# 运行抓包工具
+python capture_sfsy.py
+```
+
+详细使用说明请参考 [CAPTURE_GUIDE.md](CAPTURE_GUIDE.md)
+
+### 方法二：手动抓包
 
 1. 打开微信，进入「顺丰速运+」小程序
 2. 进入「我的」→「积分」→ 任务列表界面
@@ -41,12 +55,6 @@
    - `https://mcs-mimp-web.sf-express.com/mcs-mimp/share/weChat/shareGiftReceiveRedirect`
    - `https://mcs-mimp-web.sf-express.com/mcs-mimp/share/app/shareRedirect`
    - 任何包含 Cookie 的 mcs-mimp-web.sf-express.com 域名请求
-
-### 方法二：APP 抓包
-
-1. 打开顺丰速运 APP
-2. 进入「我的」→「积分」→ 任务列表界面
-3. 抓包获取包含 Cookie 的请求
 
 ### Cookie 格式（可选）
 
