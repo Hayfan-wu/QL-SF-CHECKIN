@@ -4,13 +4,16 @@
 
 ## 功能特性
 
-- ✅ 每日自动签到
-- 📋 自动完成日常任务
+- ✅ 三重签到兜底（APP签到 / 新签到 / 小程序签到）
+- 📋 自动完成日常任务（多渠道去重）
 - 💰 积分查询与统计
-- 🐝 采蜜游戏（可选）
-- 🎰 积分抽奖（可选）
-- 👥 多账号支持
-- 📱 支持青龙面板 / Node.js 运行
+- 🎁 生活特权自动领取
+- 🔐 MD5 签名认证，请求更稳定
+- 🌐 代理 IP 支持（可选）
+- ⚡ 多账号并发执行（最大20并发）
+- 👥 多账号支持（& 分隔）
+- ⏭️  任务跳过列表（可配置）
+- 📱 支持青龙面板 / Python 运行
 
 ## 环境变量
 
@@ -18,13 +21,14 @@
 
 | 变量名 | 说明 | 示例 |
 |--------|------|------|
-| `sfsyUrl` | 顺丰速运小程序抓包URL，多账号换行分割 | `https://mcs-mimp-web.sf-express.com/...` |
+| `sfsyUrl` | 顺丰速运小程序抓包URL，多账号用 `&` 分隔 | `https://mcs-mimp-web.sf-express.com/...` |
 
 ### 可选变量
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `sfsyBee` | 是否开启采蜜游戏（`true`/`false`） | `false` |
+| `SFBF` | 并发数量（1-20），1为串行 | `1` |
+| `SF_PROXY_API_URL` | 代理 API 地址（返回 ip:port 格式） | 空（不使用代理） |
 
 ## 抓包教程
 
@@ -36,20 +40,27 @@
 4. 找到以下任一 URL，复制完整 URL：
    - `https://mcs-mimp-web.sf-express.com/mcs-mimp/share/weChat/shareGiftReceiveRedirect`
    - `https://mcs-mimp-web.sf-express.com/mcs-mimp/share/app/shareRedirect`
-   - 任何包含 `memberId` 参数的 URL
+   - 任何包含 Cookie 的 mcs-mimp-web.sf-express.com 域名请求
 
 ### 方法二：APP 抓包
 
 1. 打开顺丰速运 APP
 2. 进入「我的」→「积分」→ 任务列表界面
-3. 抓包获取包含 `memberId` 的 URL
+3. 抓包获取包含 Cookie 的请求
+
+### Cookie 格式（可选）
+
+也可以直接使用 Cookie 字符串，格式如下：
+```
+sessionId=xxx;_login_mobile_=13800138000;_login_user_id_=xxx
+```
 
 ## 青龙面板部署
 
 ### 方式一：单文件拉取
 
 ```bash
-ql raw https://raw.githubusercontent.com/Hayfan-wu/QL-SF-CHECKIN/main/sfsy.js
+ql raw https://raw.githubusercontent.com/Hayfan-wu/QL-SF-CHECKIN/main/sfsy.py
 ```
 
 ### 方式二：仓库拉取
@@ -64,7 +75,7 @@ ql repo https://github.com/Hayfan-wu/QL-SF-CHECKIN.git "sfsy" "" ""
 
 - 名称：`sfsyUrl`
 - 值：抓包获取的完整 URL
-- 多账号：每行一个 URL
+- 多账号：用 `&` 分隔
 
 ### 定时任务
 
@@ -79,7 +90,7 @@ ql repo https://github.com/Hayfan-wu/QL-SF-CHECKIN.git "sfsy" "" ""
 ### 安装依赖
 
 ```bash
-npm install
+pip install -r requirements.txt
 ```
 
 ### 配置环境变量
@@ -95,36 +106,84 @@ export sfsyUrl="你的抓包URL"
 ### 运行脚本
 
 ```bash
-npm start
+python sfsy.py
 ```
 
 ## 脚本功能说明
 
-### 积分任务
+### 签到功能
 
-1. **每日签到** - 每天签到获取积分
-2. **浏览任务** - 模拟浏览各页面完成任务
-3. **日常任务** - 自动完成所有可完成的日常任务
-4. **积分查询** - 显示当前积分余额
+脚本会依次尝试三种签到方式，确保签到成功：
 
-### 采蜜游戏（可选）
+1. **APP 签到** - `getUnFetchPointAndDiscount` 接口
+2. **新签到** - `integralSignV2Service` 接口（V2版）
+3. **小程序签到** - `automaticSignFetchPackage` 接口
 
-- 领取可收集的蜂蜜
-- 采集花朵获得蜂蜜
-- 蜂蜜可兑换快递券和实物
+### 任务系统
 
-### 积分抽奖（可选）
+- 遍历 8 个 channelType 获取任务列表
+- 自动去重相同 taskCode 的任务
+- 自动从 `buttonRedirect` URL 中提取 taskId
+- 支持任务状态判断（1=待执行，2=待领取，3=已完成）
+- 智能重试：先直接领奖励，失败则先执行再领取
 
-- 使用积分参与抽奖
-- 有机会获得各种奖品
+### 生活特权
+
+- 自动获取生活特权列表
+- 自动领取可用的特权福利
+- 领取后自动提交任务并领取积分
+
+### 代理支持
+
+配置 `SF_PROXY_API_URL` 环境变量启用代理：
+
+```
+http://your-proxy-api.com/getProxy
+```
+
+代理 API 返回格式：`ip:port` 或 `http://ip:port`
+
+### 并发执行
+
+设置 `SFBF` 环境变量控制并发数：
+
+```bash
+export SFBF=5  # 5个账号并发执行
+```
 
 ## 多账号支持
 
-在 `sfsyUrl` 变量中每行填写一个 URL 即可支持多账号：
+在 `sfsyUrl` 变量中用 `&` 分隔多个 URL：
 
 ```
-https://mcs-mimp-web.sf-express.com/...账号1...
-https://mcs-mimp-web.sf-express.com/...账号2...
+https://mcs-mimp-web.sf-express.com/...账号1...&https://mcs-mimp-web.sf-express.com/...账号2...
+```
+
+脚本会随机打乱执行顺序，降低风控风险。
+
+## 跳过任务
+
+脚本默认跳过以下任务（在 `Config.SKIP_TASKS` 中配置）：
+
+- 用行业模板寄件下单
+- 用积分兑任意礼品
+- 参与积分活动
+- 每月累计寄件
+- 完成每月任务
+- 去使用AI寄件
+
+如需修改，可编辑脚本中的 `SKIP_TASKS` 列表。
+
+## 技术架构
+
+```
+Config          # 全局配置
+Logger          # 日志管理器（线程安全）
+ProxyManager    # 代理管理器
+SFHttpClient    # HTTP客户端（含签名、重试、代理切换）
+TaskExecutor    # 任务执行器
+AccountManager  # 账号管理器
+main()          # 主程序入口
 ```
 
 ## 注意事项
@@ -133,6 +192,7 @@ https://mcs-mimp-web.sf-express.com/...账号2...
 2. 使用本脚本所产生的一切后果由使用者自行承担
 3. 请合理使用，避免频繁请求导致账号异常
 4. 如遇接口变更，请及时更新脚本
+5. 建议使用代理 IP 降低账号封禁风险
 
 ## 免责声明
 
