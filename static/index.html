@@ -145,11 +145,16 @@ textarea:focus { outline: none; border-color: #667eea; }
     <!-- 扫码登录 -->
     <div id="tab-scan" class="card">
         <h2>📱 扫码登录获取 sfsyUrl</h2>
-        <div class="alert alert-info">
-            使用微信「扫一扫」扫描下方二维码，登录顺丰速运小程序
+        <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="btn-scan-app" style="flex:1;">📱 APP端扫码（推荐）</button>
+            <button class="btn btn-secondary" id="btn-scan-mini" style="flex:1;">💬 小程序扫码</button>
+        </div>
+        <div class="alert alert-info" id="scan-tip">
+            打开顺丰速运 APP → 扫一扫 → 扫描左侧二维码登录
         </div>
         <div id="scan-area">
             <div style="text-align:center; padding: 40px;">
+                <p style="color:#6b7280; margin-bottom: 20px;">选择上方扫码方式开始</p>
                 <button class="btn btn-primary" id="btn-start-scan" style="font-size: 18px; padding: 15px 40px;">
                     🚀 开始扫码登录
                 </button>

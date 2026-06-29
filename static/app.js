@@ -2,6 +2,7 @@
 var currentTab = 'scan';
 var scanSessionId = null;
 var scanPollTimer = null;
+var scanPlatform = 'app'; // app 或 mini
 
 // API 封装
 function api(path, method, data) {
@@ -48,26 +49,45 @@ function getStars(score) {
 }
 
 // ========== 扫码登录 ==========
+function setScanPlatform(platform) {
+    scanPlatform = platform;
+    var btnApp = document.getElementById('btn-scan-app');
+    var btnMini = document.getElementById('btn-scan-mini');
+    var tip = document.getElementById('scan-tip');
+    
+    if (platform === 'app') {
+        btnApp.className = 'btn btn-primary';
+        btnMini.className = 'btn btn-secondary';
+        if (tip) tip.innerHTML = '打开顺丰速运 APP → 扫一扫 → 扫描二维码登录';
+    } else {
+        btnApp.className = 'btn btn-secondary';
+        btnMini.className = 'btn btn-primary';
+        if (tip) tip.innerHTML = '打开微信 → 扫一扫 → 登录顺丰速运小程序';
+    }
+}
+
 function startScan() {
     var area = document.getElementById('scan-area');
     area.innerHTML = '<div style="text-align:center; padding: 40px;"><div class="loading"></div><p style="margin-top:15px; color:#6b7280;">正在生成二维码...</p></div>';
 
-    api('/api/scan/start').then(function(res) {
+    api('/api/scan/start?platform=' + scanPlatform).then(function(res) {
         scanSessionId = res.session_id;
 
         if (res.qrcodes && res.qrcodes.length > 0) {
             var html = '<div class="qr-container">';
             for (var i = 0; i < res.qrcodes.length; i++) {
                 var qr = res.qrcodes[i];
+                var platformLabel = qr.platform === 'SFAPP' ? 'APP端' : '小程序';
                 html += '<div class="qr-item">' +
                     '<img src="' + qr.qr_img + '" alt="扫码登录">' +
                     '<div class="status-badge status-waiting" id="qr-status-' + i + '">等待扫码</div>' +
-                    '<div class="api-name">接口 ' + (i + 1) + '</div>' +
+                    '<div class="api-name">' + platformLabel + ' 接口' + (i + 1) + '</div>' +
                     '</div>';
             }
             html += '</div>';
             html += '<div style="text-align:center; margin-top: 20px;">';
-            html += '<p style="color:#6b7280;">请使用微信扫一扫，登录顺丰速运小程序</p>';
+            var tipText = scanPlatform === 'app' ? '请打开顺丰速运APP扫一扫' : '请使用微信扫一扫';
+            html += '<p style="color:#6b7280;">' + tipText + '</p>';
             html += '<button class="btn btn-secondary btn-sm" style="margin-top:10px;" id="btn-refresh-qr">🔄 刷新二维码</button>';
             html += '</div>';
             area.innerHTML = html;
@@ -342,6 +362,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // 扫码登录
     var btnStart = document.getElementById('btn-start-scan');
     if (btnStart) btnStart.onclick = startScan;
+    
+    // APP/小程序切换
+    var btnScanApp = document.getElementById('btn-scan-app');
+    var btnScanMini = document.getElementById('btn-scan-mini');
+    if (btnScanApp) btnScanApp.onclick = function() { setScanPlatform('app'); };
+    if (btnScanMini) btnScanMini.onclick = function() { setScanPlatform('mini'); };
 
     // 粘贴提取
     var btnExtract = document.getElementById('btn-extract');

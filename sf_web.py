@@ -13,6 +13,7 @@ import sys
 import re
 import json
 import time
+import hashlib
 import threading
 import webbrowser
 import urllib.parse
@@ -211,33 +212,78 @@ def sync_to_qinglong(config, url):
 
 # ===== 顺丰扫码登录 =====
 SF_BASE = "https://mcs-mimp-web.sf-express.com"
+SF_TOKEN = "wwesldfs29aniversaryvdld29"
+SF_SYS_CODE = "MCS-MIMP-CORE"
 
-SF_QR_APIS = [
-    ("/commonPost/~memberNonactivity~memberQrCodeLoginService~generateQrCode", "POST", "qrCode", "qrId"),
-    ("/commonRoutePost/member/qrcode/generate", "POST", "qrCodeUrl", "qrId"),
-    ("/commonRoutePost/member/login/qrcode/create", "POST", "qrCode", "id"),
-    ("/point/qrcode/generate", "POST", "qrCode", "qrToken"),
-    ("/commonPost/~memberNonactivity~memberLoginService~generateLoginQrCode", "POST", "qrCodeImage", "qrCodeId"),
+# 小程序端接口 (MINI_PROGRAM)
+MINI_QR_APIS = [
+    ("/mcs-mimp/commonPost/~memberNonactivity~memberQrCodeLoginService~generateQrCode", "POST", "qrCode", "qrId", "MINI_PROGRAM"),
+    ("/mcs-mimp/commonRoutePost/member/qrcode/generate", "POST", "qrCodeUrl", "qrId", "MINI_PROGRAM"),
+    ("/mcs-mimp/commonRoutePost/member/login/qrcode/create", "POST", "qrCode", "id", "MINI_PROGRAM"),
+    ("/mcs-mimp/point/qrcode/generate", "POST", "qrCode", "qrToken", "MINI_PROGRAM"),
+    ("/mcs-mimp/commonPost/~memberNonactivity~memberLoginService~generateLoginQrCode", "POST", "qrCodeImage", "qrCodeId", "MINI_PROGRAM"),
+    ("/mcs-mimp/commonPost/~memberNonactivity~integralTaskSignPlusService~generateSignQrCode", "POST", "qrCode", "qrId", "MINI_PROGRAM"),
 ]
 
-SF_POLL_APIS = [
-    "/commonPost/~memberNonactivity~memberQrCodeLoginService~queryQrCodeStatus",
-    "/commonRoutePost/member/qrcode/status",
-    "/commonRoutePost/member/login/qrcode/status",
-    "/point/qrcode/status",
-    "/commonPost/~memberNonactivity~memberLoginService~checkLoginQrCode",
+MINI_POLL_APIS = [
+    "/mcs-mimp/commonPost/~memberNonactivity~memberQrCodeLoginService~queryQrCodeStatus",
+    "/mcs-mimp/commonRoutePost/member/qrcode/status",
+    "/mcs-mimp/commonRoutePost/member/login/qrcode/status",
+    "/mcs-mimp/point/qrcode/status",
+    "/mcs-mimp/commonPost/~memberNonactivity~memberLoginService~checkLoginQrCode",
+    "/mcs-mimp/commonPost/~memberNonactivity~integralTaskSignPlusService~checkSignQrCode",
+]
+
+# APP端接口 (SFAPP + 签名)
+APP_QR_APIS = [
+    ("/mcs-mimp/commonPost/~memberNonactivity~memberQrCodeLoginService~generateQrCode", "POST", "qrCode", "qrId", "SFAPP"),
+    ("/mcs-mimp/commonRoutePost/member/qrcode/generate", "POST", "qrCodeUrl", "qrId", "SFAPP"),
+    ("/mcs-mimp/commonRoutePost/member/login/qrcode/create", "POST", "qrCode", "id", "SFAPP"),
+    ("/mcs-mimp/commonPost/~memberNonactivity~memberLoginService~generateLoginQrCode", "POST", "qrCodeImage", "qrCodeId", "SFAPP"),
+    ("/mcs-mimp/commonPost/~memberNonactivity~integralTaskSignPlusService~generateSignQrCode", "POST", "qrCode", "qrId", "SFAPP"),
+    ("/mcs-mimp/commonPost/~memberActivity~memberAppLoginService~generateQrCode", "POST", "qrCode", "qrId", "SFAPP"),
+    ("/mcs-mimp/commonRoutePost/app/login/qrcode/create", "POST", "qrCode", "token", "SFAPP"),
+]
+
+APP_POLL_APIS = [
+    "/mcs-mimp/commonPost/~memberNonactivity~memberQrCodeLoginService~queryQrCodeStatus",
+    "/mcs-mimp/commonRoutePost/member/qrcode/status",
+    "/mcs-mimp/commonRoutePost/member/login/qrcode/status",
+    "/mcs-mimp/commonPost/~memberNonactivity~memberLoginService~checkLoginQrCode",
+    "/mcs-mimp/commonPost/~memberNonactivity~integralTaskSignPlusService~checkSignQrCode",
+    "/mcs-mimp/commonPost/~memberActivity~memberAppLoginService~queryQrCodeStatus",
+    "/mcs-mimp/commonRoutePost/app/login/qrcode/status",
 ]
 
 
-def sf_request(path, data=None, method="POST"):
+def generate_sign():
+    """生成API签名"""
+    timestamp = str(int(round(time.time() * 1000)))
+    data = "token=" + SF_TOKEN + "&timestamp=" + timestamp + "&sysCode=" + SF_SYS_CODE
+    signature = hashlib.md5(data.encode()).hexdigest()
+    return {
+        "sysCode": SF_SYS_CODE,
+        "timestamp": timestamp,
+        "signature": signature,
+    }
+
+
+def sf_request(path, data=None, method="POST", platform="MINI_PROGRAM", need_sign=True):
+    """发送顺丰API请求"""
     url = SF_BASE + path
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.40(0x18002829) NetType/WIFI Language/zh_CN",
         "Referer": "https://mcs-mimp-web.sf-express.com/",
         "Origin": "https://mcs-mimp-web.sf-express.com",
-        "sysCode": "MINI_PROGRAM",
+        "platform": platform,
     }
+    # APP端需要签名
+    if platform == "SFAPP" and need_sign:
+        sign_data = generate_sign()
+        headers.update(sign_data)
+    else:
+        headers["sysCode"] = platform
     try:
         body = json.dumps(data).encode() if data else None
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
@@ -268,16 +314,29 @@ def find_field(data, *field_names):
     return None
 
 
-def generate_qrcode():
+def generate_qrcode(platform_type="app"):
     results = []
-    for i, (path, method, qr_field, id_field) in enumerate(SF_QR_APIS):
+    # 根据类型选择接口
+    if platform_type == "app":
+        all_apis = APP_QR_APIS
+        all_poll = APP_POLL_APIS
+    elif platform_type == "mini":
+        all_apis = MINI_QR_APIS
+        all_poll = MINI_POLL_APIS
+    else:
+        # 全部尝试，APP优先
+        all_apis = APP_QR_APIS + MINI_QR_APIS
+        all_poll = APP_POLL_APIS + MINI_POLL_APIS
+    
+    for i, (path, method, qr_field, id_field, platform) in enumerate(all_apis):
         try:
-            data = {"channelType": "MINI_PROGRAM"} if method == "POST" else None
-            success, result = sf_request(path, data, method)
+            data = {"channelType": platform, "platform": platform} if method == "POST" else None
+            need_sign = (platform == "SFAPP")
+            success, result = sf_request(path, data, method, platform, need_sign)
             if not success:
                 continue
-            qr_code = find_field(result, qr_field, "qrCodeUrl", "qrcodeUrl", "qrCodeImage", "qrcode", "qr_code")
-            qr_id = find_field(result, id_field, "qrId", "qrCodeId", "id", "token", "qrToken", "qr_token")
+            qr_code = find_field(result, qr_field, "qrCodeUrl", "qrcodeUrl", "qrCodeImage", "qrcode", "qr_code", "qrCodeBase64")
+            qr_id = find_field(result, id_field, "qrId", "qrCodeId", "id", "token", "qrToken", "qr_token", "scene")
             if qr_code:
                 if qr_code.startswith("http"):
                     qr_img = qr_code
@@ -285,28 +344,33 @@ def generate_qrcode():
                     qr_img = qr_code
                 else:
                     qr_img = "data:image/png;base64," + qr_code
-                poll_path = SF_POLL_APIS[i] if i < len(SF_POLL_APIS) else SF_POLL_APIS[0]
+                poll_path = all_poll[i] if i < len(all_poll) else all_poll[0]
                 results.append({
                     "api_index": i,
                     "api_path": path,
+                    "platform": platform,
                     "qr_img": qr_img,
                     "qr_id": qr_id or "",
                     "poll_path": poll_path,
                 })
+                # 有结果了就先返回，不用等全部
+                if len(results) >= 3:
+                    break
         except:
             continue
     return results
 
 
-def poll_qrcode_status(qr_id, poll_path):
+def poll_qrcode_status(qr_id, poll_path, platform="SFAPP"):
     try:
-        data = {"qrId": qr_id, "qrCodeId": qr_id, "id": qr_id, "token": qr_id}
-        success, result = sf_request(poll_path, data, "POST")
+        data = {"qrId": qr_id, "qrCodeId": qr_id, "id": qr_id, "token": qr_id, "platform": platform}
+        need_sign = (platform == "SFAPP")
+        success, result = sf_request(poll_path, data, "POST", platform, need_sign)
         if not success:
             return "error", None, str(result)
         status = find_field(result, "status", "qrStatus", "codeStatus", "state")
-        token = find_field(result, "token", "accessToken", "sessionToken", "sessionId")
-        member_id = find_field(result, "memberId", "userId", "member_id", "user_id")
+        token = find_field(result, "token", "accessToken", "sessionToken", "sessionId", "memberToken")
+        member_id = find_field(result, "memberId", "userId", "member_id", "user_id", "memberCode")
         status_str = str(status).lower() if status else "unknown"
         if "wait" in status_str or "waiting" in status_str or status_str == "0" or status_str == "1":
             return "waiting", None, None
@@ -425,16 +489,19 @@ class WebHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/scan/start":
-            results = generate_qrcode()
+            params = urllib.parse.parse_qs(parsed.query)
+            platform = params.get("platform", ["app"])[0]  # app 或 mini
+            results = generate_qrcode(platform)
             session_id = str(int(time.time() * 1000))
             scan_sessions[session_id] = {
                 "results": results,
                 "status": "pending",
                 "created_at": time.time(),
+                "platform": platform,
             }
             self.send_json({
                 "session_id": session_id,
-                "qrcodes": [{"api_index": r["api_index"], "qr_img": r["qr_img"]} for r in results[:3]],
+                "qrcodes": [{"api_index": r["api_index"], "qr_img": r["qr_img"], "platform": r["platform"]} for r in results[:3]],
                 "count": len(results),
             })
             return
@@ -453,7 +520,8 @@ class WebHandler(BaseHTTPRequestHandler):
                 poll_path = result.get("poll_path", "")
                 if not qr_id:
                     continue
-                status, data, error = poll_qrcode_status(qr_id, poll_path)
+                platform = result.get("platform", "SFAPP")
+                status, data, error = poll_qrcode_status(qr_id, poll_path, platform)
                 if status == "success":
                     session["status"] = "success"
                     session["login_data"] = data
