@@ -1,0 +1,35 @@
+name: 顺丰速运每日签到
+
+on:
+  schedule:
+    # 每天北京时间 8:51 和 21:51 运行
+    - cron: '51 0,13 * * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: '是否开启调试模式'
+        required: false
+        default: 'false'
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    name: 执行签到任务
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run check-in script
+        env:
+          sfsyUrl: ${{ secrets.SFSY_URL }}
+          sfsyBee: ${{ secrets.SFSY_BEE }}
+        run: node sfsy.js
