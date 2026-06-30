@@ -1,8 +1,8 @@
 """
 顺丰速运日常积分任务
 Author: 爱学习的呆子
-Version: 1.3.0
-Date: 2026-04-04
+Version: 1.4.0
+Date: 2026-06-30
 """
 
 import hashlib
@@ -45,7 +45,7 @@ print_lock = Lock()  # 用于保护打印输出
 class Config:
     """全局配置"""
     APP_NAME: str = "顺丰速运"
-    VERSION: str = "1.3.0"
+    VERSION: str = "1.4.0"
     ENV_NAME: str = "sfsyUrl"
     PROXY_API_URL: str = os.getenv('SF_PROXY_API_URL', '')
     
@@ -65,139 +65,14 @@ class Config:
     WXPUSHER_APP_TOKEN: str = os.getenv('WXPUSHER_APP_TOKEN', '')
     WXPUSHER_UIDS: str = os.getenv('WXPUSHER_UIDS', '')
     WXPUSHER_TOPIC_IDS: str = os.getenv('WXPUSHER_TOPIC_IDS', '')
+    # 是否只在过期时推送（True=只推过期，False=每次都推汇总）
+    WXPUSHER_ONLY_EXPIRED: bool = os.getenv('WXPUSHER_ONLY_EXPIRED', 'true').lower() == 'true'
     
     def __post_init__(self):
         if self.SKIP_TASKS is None:
             # 尝试直接提交所有任务，看看能否领取奖励
             # 原本跳过的任务：'用行业模板寄件下单'、'去新增一个收件偏好'
             self.SKIP_TASKS = ['用行业模板寄件下单','用积分兑任意礼品','参与积分活动','每月累计寄件','完成每月任务','去使用AI寄件']
-
-
-# ==================== WxPusher 推送 ====================
-class WxPusher:
-    """WxPusher 微信推送"""
-    
-    API_URL = 'https://wxpusher.zjiecode.com/api/send/message'
-    
-    def __init__(self, app_token: str, uids: str = '', topic_ids: str = ''):
-        self.app_token = app_token
-        self.uids = [u.strip() for u in uids.split(',') if u.strip()] if uids else []
-        self.topic_ids = [t.strip() for t in topic_ids.split(',') if t.strip()] if topic_ids else []
-    
-    def is_enabled(self) -> bool:
-        """是否启用推送"""
-        return bool(self.app_token and (self.uids or self.topic_ids))
-    
-    def send(self, title: str, content: str, content_type: int = 1) -> bool:
-        """
-        发送推送消息
-        
-        Args:
-            title: 消息标题
-            content: 消息内容（支持HTML，content_type=2时）
-            content_type: 1=文本，2=HTML，3=Markdown
-        
-        Returns:
-            bool: 是否发送成功
-        """
-        if not self.is_enabled():
-            return False
-        
-        try:
-            payload = {
-                'appToken': self.app_token,
-                'content': content,
-                'summary': title,
-                'contentType': content_type,
-            }
-            
-            if self.uids:
-                payload['uids'] = self.uids
-            if self.topic_ids:
-                payload['topicIds'] = self.topic_ids
-            
-            resp = requests.post(self.API_URL, json=payload, timeout=10)
-            result = resp.json()
-            
-            if result.get('code') == 1000:
-                print(f"📨 WxPusher 推送成功: {title}")
-                return True
-            else:
-                print(f"📨 WxPusher 推送失败: {result.get('msg', '未知错误')}")
-                return False
-        except Exception as e:
-            print(f"📨 WxPusher 推送异常: {str(e)[:80]}")
-            return False
-    
-    def send_expiry_notice(self, phone: str, account_index: int) -> bool:
-        """
-        发送 sfsyUrl 过期提醒
-        
-        Args:
-            phone: 手机号
-            account_index: 账号序号
-        
-        Returns:
-            bool: 是否发送成功
-        """
-        masked_phone = phone[:3] + "****" + phone[7:] if phone and len(phone) >= 11 else "未知"
-        
-        title = f"⚠️ 顺丰账号{account_index} 登录过期"
-        content = f"""顺丰速运签到提醒
-
-账号{account_index}（{masked_phone}）的 sfsyUrl 已过期，请及时更新。
-
-失效原因：登录态失效，无法完成签到任务
-更新方式：重新抓包获取最新的 sessionId
-
----
-来自：顺丰速运每日签到脚本"""
-        
-        return self.send(title, content)
-    
-    def send_summary(self, total: int, success: int, fail: int, results: List[Dict]) -> bool:
-        """
-        发送每日签到汇总
-        
-        Args:
-            total: 账号总数
-            success: 成功数
-            fail: 失败数
-            results: 所有账号的结果列表
-        
-        Returns:
-            bool: 是否发送成功
-        """
-        if fail == 0:
-            title = f"✅ 顺丰签到全部成功 ({success}/{total})"
-        else:
-            title = f"⚠️ 顺丰签到有失败 ({success}/{total})"
-        
-        lines = [f"顺丰速运每日签到汇总", f"", f"📊 统计：成功 {success} / 共 {total}"]
-        
-        total_earned = 0
-        for r in results:
-            idx = r.get('index', 0) + 1
-            phone = r.get('phone', '')
-            masked = phone[:3] + "****" + phone[7:] if phone and len(phone) >= 11 else "未登录"
-            earned = r.get('points_earned', 0)
-            total_pts = r.get('points_after', 0)
-            ok = r.get('success', False)
-            
-            status = "✅" if ok else "❌"
-            if ok:
-                lines.append(f"{status} 账号{idx}（{masked}）+{earned}分，总计{total_pts}")
-            else:
-                lines.append(f"{status} 账号{idx}（{masked}）登录失效，请更新")
-        
-        lines.append("")
-        lines.append(f"💰 今日总获得：{total_earned} 积分")
-        lines.append("")
-        lines.append("---")
-        lines.append("来自：顺丰速运每日签到脚本")
-        
-        content = "\n".join(lines)
-        return self.send(title, content)
 
 
 # ==================== 日志系统 ====================
@@ -327,6 +202,120 @@ class Logger:
     def get_account_messages(self) -> str:
         """获取当前账号消息"""
         return '\n'.join(self.current_account_msg)
+
+
+# ==================== WxPusher 推送 ====================
+class WxPusherNotifier:
+    """WxPusher 微信消息推送"""
+    
+    API_URL = 'https://wxpusher.zjiecode.com/api/send/message'
+    
+    def __init__(self, config: Config):
+        self.app_token = config.WXPUSHER_APP_TOKEN
+        self.uids = [u.strip() for u in config.WXPUSHER_UIDS.split(',') if u.strip()] if config.WXPUSHER_UIDS else []
+        self.topic_ids = [t.strip() for t in config.WXPUSHER_TOPIC_IDS.split(',') if t.strip()] if config.WXPUSHER_TOPIC_IDS else []
+        self.enabled = bool(self.app_token and (self.uids or self.topic_ids))
+    
+    def send(self, title: str, content: str, content_type: int = 1) -> bool:
+        """发送消息
+        
+        Args:
+            title: 消息标题
+            content: 消息内容（支持 Markdown，content_type=2 时）
+            content_type: 1=文本，2=HTML，3=Markdown
+            
+        Returns:
+            bool: 是否发送成功
+        """
+        if not self.enabled:
+            return False
+        
+        try:
+            payload = {
+                'appToken': self.app_token,
+                'content': content,
+                'summary': title,
+                'contentType': content_type,
+            }
+            if self.uids:
+                payload['uids'] = self.uids
+            if self.topic_ids:
+                payload['topicIds'] = self.topic_ids
+            
+            response = requests.post(self.API_URL, json=payload, timeout=10)
+            result = response.json()
+            
+            if result.get('code') == 1000:
+                print(f"📨 WxPusher 推送成功: {title}")
+                return True
+            else:
+                print(f"❌ WxPusher 推送失败: {result.get('msg', '未知错误')}")
+                return False
+        except Exception as e:
+            print(f"❌ WxPusher 推送异常: {str(e)}")
+            return False
+    
+    def notify_expired(self, account_index: int, phone: str = '') -> bool:
+        """推送 sfsyUrl 过期提醒
+        
+        Args:
+            account_index: 账号序号
+            phone: 手机号（可选）
+            
+        Returns:
+            bool: 是否发送成功
+        """
+        phone_display = f"（{phone[:3]}****{phone[7:]}）" if phone else ""
+        title = f"⚠️ 顺丰账号{account_index} sfsyUrl 已过期"
+        content = f"""## ⚠️ 顺丰速运 sfsyUrl 过期提醒
+
+**账号{account_index}**{phone_display} 的 sfsyUrl 已失效，请及时更新！
+
+### 重新获取方法（iPhone Stream 抓包）
+
+1. App Store 下载「Stream」
+2. 安装 HTTPS 证书并信任
+3. 开始抓包 → 打开顺丰小程序
+4. 搜索 `mcs-mimp-web` 找到 POST 请求
+5. 复制 Cookie 中的 `sessionId`、`_login_mobile_`、`_login_user_id_`
+6. 拼成格式：`sessionId=xxx;_login_mobile_=xxx;_login_user_id_=xxx`
+
+---
+*发送时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
+"""
+        return self.send(title, content, content_type=3)
+    
+    def notify_summary(self, results: List[Dict], total_earned: int) -> bool:
+        """推送签到汇总
+        
+        Args:
+            results: 所有账号结果列表
+            total_earned: 今日总获得积分
+            
+        Returns:
+            bool: 是否发送成功
+        """
+        success_count = sum(1 for r in results if r['success'])
+        fail_count = len(results) - success_count
+        
+        title = f"📊 顺丰签到汇总（{success_count}/{len(results)}成功，获得{total_earned}积分）"
+        
+        content_lines = ["## 📊 顺丰速运每日签到汇总\n"]
+        
+        for r in results:
+            idx = r['index'] + 1
+            if r['success']:
+                phone = r['phone'][:3] + "****" + r['phone'][7:] if r['phone'] else "未知"
+                earned = r['points_earned']
+                total = r['points_after']
+                content_lines.append(f"- **账号{idx}** {phone}：+{earned} 积分，总 {total} ✅")
+            else:
+                content_lines.append(f"- **账号{idx}**：执行失败 ❌（可能已过期）")
+        
+        content_lines.append(f"\n---\n*发送时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        
+        content = '\n'.join(content_lines)
+        return self.send(title, content, content_type=3)
 
 
 # ==================== 代理管理器 ====================
@@ -1179,32 +1168,26 @@ class AccountManager:
         points_before, points_after = executor.run_all_tasks()
         points_earned = points_after - points_before
         
-        # 检测登录态是否真的有效（积分都是0且签到失败，提示用户信息失效）
-        all_sign_failed = not app_sign_success and not new_sign_success and not sign_success
-        user_info_invalid = (
-            '用户信息失效' in app_error_msg or 
-            '用户信息失效' in new_sign_error or 
-            '用户信息失效' in error_msg
-        )
+        # 检测 session 是否失效（用户信息失效表示 sfsyUrl 已过期）
+        session_expired = False
+        if not app_sign_success and '用户信息失效' in app_error_msg:
+            session_expired = True
+        elif not sign_success and '用户信息失效' in error_msg:
+            session_expired = True
+        elif points_before == 0 and points_after == 0 and not app_sign_success and not sign_success:
+            session_expired = True
         
-        if all_sign_failed and user_info_invalid and points_after == 0:
-            self.logger.error(f'账号{self.account_index} 登录态已失效，请更新 sfsyUrl')
-            return {
-                'success': False,
-                'phone': self.phone,
-                'points_before': 0,
-                'points_after': 0,
-                'points_earned': 0,
-                'expired': True
-            }
+        if session_expired:
+            self.logger.error(f'账号{self.account_index} sfsyUrl 已过期，请重新获取')
         
         # 返回统计信息
         return {
-            'success': True,
+            'success': not session_expired,
             'phone': self.phone,
             'points_before': points_before,
             'points_after': points_after,
-            'points_earned': points_earned
+            'points_earned': points_earned,
+            'expired': session_expired
         }
 
 
@@ -1340,11 +1323,23 @@ def main():
     print(f"{'汇总':<6} {'账号总数: ' + str(len(all_results)):<15} {'今日总获得: ' + str(total_earned):<15} {'':<15} {'成功: ' + str(success_count):<10}")
     print("=" * 80)
     
-    # WxPusher 推送汇总
-    pusher = WxPusher(config.WXPUSHER_APP_TOKEN, config.WXPUSHER_UIDS, config.WXPUSHER_TOPIC_IDS)
-    if pusher.is_enabled():
-        print("\n📨 正在推送签到汇总...")
-        pusher.send_summary(len(all_results), success_count, fail_count, all_results)
+    # WxPusher 推送
+    notifier = WxPusherNotifier(config)
+    if notifier.enabled:
+        if fail_count > 0:
+            # 有失败账号，逐个推送过期提醒
+            print(f"\n📨 检测到 {fail_count} 个账号执行失败，正在推送过期提醒...")
+            for result in all_results:
+                if not result['success']:
+                    notifier.notify_expired(result['index'] + 1, result.get('phone', ''))
+                    time.sleep(1)  # 避免发送过快
+        elif not config.WXPUSHER_ONLY_EXPIRED:
+            # 没有失败且配置了非仅过期模式，推送汇总
+            print("\n📨 正在推送签到汇总...")
+            notifier.notify_summary(all_results, total_earned)
+    else:
+        if fail_count > 0:
+            print(f"\n💡 提示：检测到 {fail_count} 个账号执行失败，配置 WxPusher 可收到过期提醒")
     
     print("\n🎊 所有账号任务执行完成!")
 

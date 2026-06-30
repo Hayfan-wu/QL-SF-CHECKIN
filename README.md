@@ -14,6 +14,7 @@
 - 👥 多账号支持（& 分隔）
 - ⏭️  任务跳过列表（可配置）
 - 📱 支持青龙面板 / Python 运行
+- 📨 WxPusher 微信推送（sfsyUrl 过期提醒）
 
 ## 环境变量
 
@@ -29,9 +30,10 @@
 |--------|------|--------|
 | `SFBF` | 并发数量（1-20），1为串行 | `1` |
 | `SF_PROXY_API_URL` | 代理 API 地址（返回 ip:port 格式） | 空（不使用代理） |
-| `WXPUSHER_APP_TOKEN` | WxPusher 应用Token（启用推送） | 空（不推送） |
-| `WXPUSHER_UIDS` | WxPusher 用户UID，多个用逗号分隔 | 空 |
-| `WXPUSHER_TOPIC_IDS` | WxPusher 主题ID，多个用逗号分隔 | 空 |
+| `WXPUSHER_APP_TOKEN` | WxPusher 应用 Token（开启推送） | 空（不推送） |
+| `WXPUSHER_UIDS` | WxPusher 接收 UID，多个用逗号分隔 | 空 |
+| `WXPUSHER_TOPIC_IDS` | WxPusher 主题 ID，多个用逗号分隔 | 空 |
+| `WXPUSHER_ONLY_EXPIRED` | 只在过期时推送（true/false） | `true` |
 
 ## 获取 sfsyUrl
 
@@ -151,6 +153,33 @@ http://your-proxy-api.com/getProxy
 export SFBF=5  # 5个账号并发执行
 ```
 
+### WxPusher 微信推送
+
+配置后当 sfsyUrl 过期时会自动发送微信提醒，无需每天手动检查。
+
+#### 1. 获取 WxPusher Token
+
+1. 访问 [WxPusher 官网](https://wxpusher.zjiecode.com/admin/)
+2. 微信扫码登录
+3. 进入「应用信息」→ 创建/查看应用，获取 `APP_TOKEN`
+4. 进入「用户管理」→ 获取你的 `UID`
+
+#### 2. 配置环境变量
+
+在青龙面板 → 环境变量中添加：
+
+| 变量名 | 值 | 必填 |
+|--------|-----|------|
+| `WXPUSHER_APP_TOKEN` | WxPusher 应用 Token | ✅ |
+| `WXPUSHER_UIDS` | 接收消息的 UID，多个用逗号分隔 | ✅（二选一） |
+| `WXPUSHER_TOPIC_IDS` | 接收消息的主题 ID，多个用逗号分隔 | ✅（二选一） |
+| `WXPUSHER_ONLY_EXPIRED` | `true`=只推过期提醒，`false`=每次都推汇总 | ❌ |
+
+#### 3. 推送内容
+
+- **过期提醒**：包含账号序号、手机号（脱敏）、重新获取方法
+- **签到汇总**（可选）：所有账号的积分获取情况
+
 ## 多账号支持
 
 在 `sfsyUrl` 变量中用 `&` 分隔多个登录态：
@@ -185,34 +214,6 @@ TaskExecutor    # 任务执行器
 AccountManager  # 账号管理器
 main()          # 主程序入口
 ```
-
-## WxPusher 推送（可选）
-
-支持通过 WxPusher 推送签到结果和 sfsyUrl 过期提醒到微信。
-
-### 配置方式
-
-在青龙面板 → 环境变量中添加：
-
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `WXPUSHER_APP_TOKEN` | WxPusher 应用 Token（必填） | `AT_xxx...` |
-| `WXPUSHER_UIDS` | 用户 UID，多个用逗号分隔 | `UID_xxx,UID_yyy` |
-| `WXPUSHER_TOPIC_IDS` | 主题 ID，多个用逗号分隔 | `123,456` |
-
-> `WXPUSHER_UIDS` 和 `WXPUSHER_TOPIC_IDS` 至少配置一个。
-
-### 推送内容
-
-- **全部成功**：推送签到汇总，包含每个账号获得的积分
-- **有账号失效**：推送失败提醒，提示哪个账号的 sfsyUrl 需要更新
-
-### 获取 WxPusher Token
-
-1. 微信搜索「WxPusher」公众号并关注
-2. 访问 [wxpusher.zjiecode.com](https://wxpusher.zjiecode.com/) 注册账号
-3. 创建应用，获取 `APP_TOKEN`
-4. 在公众号后台获取你的 `UID`
 
 ## 注意事项
 
